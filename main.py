@@ -36,9 +36,9 @@ app = FastAPI(
 # Configure CORS
 # For development, allow all origins. In production, restrict this to frontend's domain.
 origins = [
-    "https://sg-carpark-finder-fe.vercel.app/",
-    "https://sg-carpark-finder-fe-faizs-projects-f7b13609.vercel.app/",
-    "https://sg-carpark-finder-fe-git-main-faizs-projects-f7b13609.vercel.app/"
+    "https://sg-carpark-finder-fe.vercel.app",
+    "https://sg-carpark-finder-fe-faizs-projects-f7b13609.vercel.app",
+    "https://sg-carpark-finder-fe-git-main-faizs-projects-f7b13609.vercel.app"
 ]
 
 app.add_middleware(
