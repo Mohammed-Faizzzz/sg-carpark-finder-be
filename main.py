@@ -36,12 +36,7 @@ app = FastAPI(
 # Configure CORS
 # For development, allow all origins. In production, restrict this to frontend's domain.
 origins = [
-    "*"
-    # Add deployed frontend URL here post-deployment of React app:
-    # "http://localhost",
-    # "http://localhost:3000",
-    # "https://frontend-app.netlify.app",
-    # "https://Mohammed-Faizzzz.github.io" # If hosted on GitHub Pages (adjust path for repo name)
+    "https://sg-carpark-finder-quf8u6u85-faizs-projects-f7b13609.vercel.app",
 ]
 
 app.add_middleware(
