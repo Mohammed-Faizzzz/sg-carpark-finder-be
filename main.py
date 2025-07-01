@@ -210,4 +210,11 @@ async def find_carpark(postcode: str = Query(..., min_length=6, max_length=6, re
     # print(f"Returning top {len(top_n_carparks)} nearest suitable carparks for {postcode}.")
     print(top_n_carparks)
     return top_n_carparks
+
+@app.get("/health")
+async def health_check():
+    """
+    Simple health check endpoint to keep the service awake.
+    """
+    return {"status": "ok", "timestamp": datetime.now().isoformat()}
     
