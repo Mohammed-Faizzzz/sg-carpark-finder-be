@@ -415,19 +415,20 @@ def calc_hdb_cost(carpark, start_time, end_time, overnight=False): # call separa
     
     # Grace period of 15 minutes
     if end_time - start_time <= timedelta(minutes=15):
-        return total_cost
+        return 0.0
     
     # assume end time is always after start time (ie no overnight parking)
     # get the day type for the start time
     day_of_week_int = start_time.weekday()
     day = "weekdays" if day_of_week_int < 5 else "saturdays" if day_of_week_int == 5 else "sundays"
     rate_per_half_hour = 0.60
+    rate_per_minute = rate_per_half_hour / 30.0
     
     if carpark not in special_rates_HDB:
         # divide the time (18:46:09) into half-hour slots (or part thereof)
-        num_half_hours = math.ceil((end_time - start_time).total_seconds() / 1800)
-        total_cost = num_half_hours * rate_per_half_hour
-        return total_cost
+        duration_in_minutes = math.ceil((end_time - start_time).total_seconds() / 60)
+        total_cost = duration_in_minutes * rate_per_minute
+        return round(total_cost, 2)
     
     # if special carpark, get the rates for the day
     rates = special_rates_HDB[carpark][day]
@@ -442,9 +443,9 @@ def calc_hdb_cost(carpark, start_time, end_time, overnight=False): # call separa
         
         # Case 1: period is within a single rate period
         if start_time >= rate_start and end_time <= rate_end:
-            num_half_hours = math.ceil((end_time - start_time).total_seconds() / 1800)
-            total_cost += num_half_hours * rate["rate_per_half_hour"]
-            return total_cost
+            duration_in_minutes = math.ceil((end_time - start_time).total_seconds() / 60)
+            total_cost += duration_in_minutes * rate["rate_per_half_hour"] / 30.0
+            return round(total_cost, 2)
         
         # Case 2: period is later than this rate period
         if start_time > rate_end:
@@ -452,11 +453,11 @@ def calc_hdb_cost(carpark, start_time, end_time, overnight=False): # call separa
         
         # Case 3: overlaps occur
         if start_time >= rate_start and end_time > rate_end:
-            num_half_hours = math.ceil((rate_end - start_time).total_seconds() / 1800)
-            total_cost += num_half_hours * rate["rate_per_half_hour"]
-            start_time = rate_end + timedelta(seconds=1)  # move start_time to the end of this rate period
+            duration_in_minutes = math.ceil((rate_end - start_time).total_seconds() / 60)
+            total_cost += duration_in_minutes * rate["rate_per_half_hour"] /30
+            start_time = rate_end + timedelta(seconds=1) # 19:59:59 + 1 second = 20:00:00
             continue
-    return total_cost
+    return round(total_cost, 2)
 
 # create datetime objects for start and end times
 # end_time = datetime.strptime("23:59:59", "%H:%M:%S").time()
