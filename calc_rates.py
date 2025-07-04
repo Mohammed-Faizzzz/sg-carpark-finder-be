@@ -1,6 +1,8 @@
 from datetime import datetime, time, date, timedelta # Ensure these are imported
 import math
 
+# Use datetime for parsing and manipulating time strings, currently using time which cannot be subtracted
+
 # Example start and end times for testing
 # get only the time part of the current datetime without the decimal part
 # now = datetime.now().time().replace(microsecond=0)
@@ -61,17 +63,19 @@ def get_rate_for_day(rate_rule: dict, day_type: str) -> dict:
         return {"min_duration": min_duration, "rate": rate_val}
     return {"min_duration": 0, "rate": 0.0}
 
+# input: datetime objects, carpark dictionary with rate rules
 def calc_cost(carpark, start_time, end_time):
     if carpark['type'] == 'HDB':
-        if start_time > end_time: # overnight parking
+        start_date, end_date = start_time.date(), end_time.date()
+        if end_date > start_date: # overnight parking
             # Calculate cost for the first day, set end_time to 23:59:59
-            first_day_end_time = time(23, 59, 59)
-            second_day_start_time = time(0, 0, 0)
-            return calc_hdb_cost(carpark, start_time, first_day_end_time) + calc_hdb_cost(carpark, second_day_start_time, end_time, overnight=True)
+            first_day_end_time = datetime.combine(start_date, time(23, 59, 59))
+            second_day_start_time = datetime.combine(end_date, time(0, 0, 0))
+            return calc_hdb_cost(carpark['carpark_number'], start_time, first_day_end_time) + calc_hdb_cost(carpark['carpark_number'], second_day_start_time, end_time)
         else:
-            return calc_hdb_cost(carpark, start_time, end_time)
+            return calc_hdb_cost(carpark['carpark_number'], start_time, end_time)
     elif carpark['type'] == 'URA':
-        return calc_ura_cost(carpark, start_time, end_time)
+        return calc_ura_cost(carpark['carpark_number'], start_time, end_time)
     else:
         raise ValueError("Unknown carpark type")
 
@@ -411,15 +415,13 @@ def calc_hdb_cost(carpark, start_time, end_time, overnight=False): # call separa
     
     # assume end time is always after start time (ie no overnight parking)
     # get the day type for the start time
-    day_of_week_int = date.today().weekday()
-    if overnight:
-        day_of_week_int = (day_of_week_int + 1) % 7
+    day_of_week_int = start_time.weekday()
     day = "weekdays" if day_of_week_int < 5 else "saturdays" if day_of_week_int == 5 else "sundays"
     rate_per_half_hour = 0.60
     
     if carpark not in special_rates_HDB:
         # divide the time (18:46:09) into half-hour slots (or part thereof)
-        num_half_hours = (end_time - start_time).total_seconds() / 1800
+        num_half_hours = math.ceil((end_time - start_time).total_seconds() / 1800)
         total_cost = num_half_hours * rate_per_half_hour
         return total_cost
     
@@ -427,31 +429,35 @@ def calc_hdb_cost(carpark, start_time, end_time, overnight=False): # call separa
     rates = special_rates_HDB[carpark][day]
     
     for rate in rates:
+        # convert rate start and end times to datetime.time objects
+        # to compare with start_time and end_time
         rate_start = datetime.strptime(rate["start"], "%H:%M:%S").time()
         rate_end = datetime.strptime(rate["end"], "%H:%M:%S").time()
+        rate_start = datetime.combine(start_time.date(), rate_start)
+        rate_end = datetime.combine(start_time.date(), rate_end)
         
         # Case 1: period is within a single rate period
-        if start_time.time() >= rate_start and end_time.time() <= rate_end:
-            num_half_hours = (end_time - start_time).total_seconds() / 1800
-            total_cost = num_half_hours * rate["rate_per_half_hour"]
+        if start_time >= rate_start and end_time <= rate_end:
+            num_half_hours = math.ceil((end_time - start_time).total_seconds() / 1800)
+            total_cost += num_half_hours * rate["rate_per_half_hour"]
             return total_cost
         
         # Case 2: period is later than this rate period
-        if start_time.time() >= rate_end:
+        if start_time > rate_end:
             continue
         
         # Case 3: overlaps occur
-        if start_time.time() >= rate_start and end_time.time() > rate_end:
-            # calculate cost for this rate period
-            total_cost += (rate_end - start_time).total_seconds() / 1800 * rate["rate_per_half_hour"]
-            start_time = datetime.combine(start_time.date(), rate_end) + timedelta(milliseconds=1)
+        if start_time >= rate_start and end_time > rate_end:
+            num_half_hours = math.ceil((rate_end - start_time).total_seconds() / 1800)
+            total_cost += num_half_hours * rate["rate_per_half_hour"]
+            start_time = rate_end + timedelta(seconds=1)  # move start_time to the end of this rate period
             continue
     return total_cost
 
 # create datetime objects for start and end times
-end_time = datetime.strptime("23:59:59", "%H:%M:%S")
-start_time = datetime.strptime("00:00:00", "%H:%M:%S")
-date_tomorrow = date.today() + timedelta(days=1)
-print(start_time, end_time)
-print(end_time - start_time)
-print(calc_hdb_cost("MP14", start_time, end_time))    
+# end_time = datetime.strptime("23:59:59", "%H:%M:%S").time()
+# start_time = datetime.strptime("00:00:00", "%H:%M:%S").time()
+# date_tomorrow = date.today() + timedelta(days=1)
+# print(start_time, end_time)
+# # print(end_time - start_time)
+# print(calc_hdb_cost("MP14", start_time, end_time)) # $33.60
