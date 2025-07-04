@@ -24,6 +24,7 @@ data = {}
 svy21_to_wgs84_transformer = Transformer.from_crs("EPSG:3414", "EPSG:4326", always_xy=True)
 
 def load_HDB_carpark_data(file_path, data):
+        
     try:
         with open(file_path, mode='r', encoding='utf-8') as file:
             reader = csv.DictReader(file)
