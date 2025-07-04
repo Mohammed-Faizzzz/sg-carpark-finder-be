@@ -2,3 +2,4 @@ venv
 __pycache__
 .env
 carpark_data.json
+carpark_rates.json

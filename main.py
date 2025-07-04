@@ -141,10 +141,10 @@ async def startup_event():
 
 
 @app.get("/find-carpark")
-async def find_carpark(postcode: str = Query(..., min_length=6, max_length=6, regex="^[0-9]{6}$")):
-# async def find_carpark():
-    # postcode = "341119"
-    logger.info(f"Received request for postcode: {postcode}")
+async def find_carpark(search_query: str = Query(..., min_length=1, max_length=100, description="Postcode or building name"), # CHANGE THIS
+    limit: int = Query(10, gt=0, le=50)):
+    # search_query = "London Bridge"
+    logger.info(f"Received request for search_query: {search_query}, limit: {limit}")
 
     user_lat, user_lng = None, None
 
@@ -154,7 +154,7 @@ async def find_carpark(postcode: str = Query(..., min_length=6, max_length=6, re
 
     # 1. Get Postcode Coordinates from OneMap API
     try:
-        onemap_url = f"https://www.onemap.gov.sg/api/common/elastic/search?searchVal={postcode}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
+        onemap_url = f"https://www.onemap.gov.sg/api/common/elastic/search?searchVal={search_query}&returnGeom=Y&getAddrDetails=Y&pageNum=1"
         onemap_response = requests.get(onemap_url, headers=headers)
         onemap_response.raise_for_status()
         onemap_data = onemap_response.json()
@@ -165,16 +165,16 @@ async def find_carpark(postcode: str = Query(..., min_length=6, max_length=6, re
             user_lng = float(first_result.get('LONGITUDE'))
             if user_lat is None or user_lng is None:
                  raise ValueError("Latitude or Longitude missing from OneMap response.")
-            logger.info(f"OneMap: Postcode {postcode} geocoded to {user_lat}, {user_lng}")
+            logger.info(f"OneMap: {search_query} geocoded to {user_lat}, {user_lng}")
         else:
-            logger.warning(f"OneMap: No results found for postcode {postcode}")
-            raise HTTPException(status_code=404, detail="Postcode not found or invalid.")
+            logger.warning(f"OneMap: No results found for {search_query}")
+            raise HTTPException(status_code=404, detail="Location not found or invalid.")
     except requests.exceptions.RequestException as e:
         logger.error(f"OneMap API request failed: {e}")
         raise HTTPException(status_code=500, detail="Error connecting to OneMap API.")
     except (ValueError, KeyError, TypeError) as e:
-        logger.error(f"Error processing OneMap data for {postcode}: {e}")
-        raise HTTPException(status_code=500, detail="An internal error occurred processing postcode data.")
+        logger.error(f"Error processing OneMap data for {search_query}: {e}")
+        raise HTTPException(status_code=500, detail="An internal error occurred processing location data.")
 
     # 2. Calculate Nearest Available Carparks
     searchable_carparks = []
