@@ -413,6 +413,10 @@ special_rates_HDB = {
 def calc_hdb_cost(carpark, start_time, end_time, overnight=False): # call separately for each day if overnight, then pass overnight=True for the next day
     total_cost = 0.0
     
+    # Grace period of 15 minutes
+    if end_time - start_time <= timedelta(minutes=15):
+        return total_cost
+    
     # assume end time is always after start time (ie no overnight parking)
     # get the day type for the start time
     day_of_week_int = start_time.weekday()
