@@ -127,14 +127,18 @@ async def startup_event():
     global carpark_data
     global real_time_data
     
-    # Load URA carpark data from GeoJSON file
-    prep_data_file_ura = './URAParkingLotGEOJSON.geojson'
-    carpark_data = load_URA_carpark_data(prep_data_file_ura, carpark_data)
-
-    # Load HDB static data using the imported function
-    hdb_csv_path = './HDBCarparkInformation.csv'
-    carpark_data = load_HDB_carpark_data(hdb_csv_path, carpark_data)
+    #load carpark data from combined_carpark_data.json and make it a hashmap
+    combined_data_file = './combined_carpark_data.json'
+    if os.path.exists(combined_data_file):
+        with open(combined_data_file, 'r', encoding='utf-8') as f:
+            try:
+                carpark_data = json.load(f)
+                logger.info(f"Loaded {len(carpark_data)} carparks from {combined_data_file}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Error decoding JSON from {combined_data_file}: {e}")
+    
     real_time_data = carpark_data.copy()
+    print(carpark_data)
 
     # Start the background task to update real-time availability
     asyncio.create_task(update_realtime_availability_task(real_time_data))
@@ -192,6 +196,9 @@ async def find_carpark(search_query: str = Query(..., min_length=1, max_length=1
             carpark['available_lots'] = real_time_data.get(cp_number, {}).get('available_lots', 'N/A')
 
         carpark_lat, carpark_lng = carpark['coordinates']
+        if carpark_lat is None or carpark_lng is None:
+            print(f"Carpark {cp_number} has invalid coordinates: {carpark['coordinates']}")
+            continue
 
         # Calculate distance
         distance = get_distance(user_lat, user_lng, carpark_lat, carpark_lng)
