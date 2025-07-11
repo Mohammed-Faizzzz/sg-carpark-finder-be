@@ -7,6 +7,8 @@ import json
 import os
 import asyncio
 from startup import load_HDB_carpark_data, update_realtime_availability_task, parse_ura_feature, load_URA_carpark_data
+from ura_availability import get_access_token, update_URA_availability
+from datetime import datetime
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -25,7 +27,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 carpark_data = {}
-real_time_data = {}
+real_time_data_hdb = {}
+real_time_data_ura = {}
 
 app = FastAPI(
     title="Singapore Carpark Finder API",
@@ -36,6 +39,7 @@ app = FastAPI(
 # Configure CORS
 # For development, allow all origins. In production, restrict this to frontend's domain.
 origins = [
+    "*",
     "https://sg-carpark-finder-fe.vercel.app",
     "https://sg-carpark-finder-fe-faizs-projects-f7b13609.vercel.app",
     "https://sg-carpark-finder-fe-git-main-faizs-projects-f7b13609.vercel.app"
@@ -125,7 +129,8 @@ async def startup_event():
     This runs once when the FastAPI application starts.
     """
     global carpark_data
-    global real_time_data
+    global real_time_data_hdb
+    global real_time_data_ura
     
     #load carpark data from combined_carpark_data.json and make it a hashmap
     combined_data_file = './combined_carpark_data.json'
@@ -137,11 +142,13 @@ async def startup_event():
             except json.JSONDecodeError as e:
                 logger.error(f"Error decoding JSON from {combined_data_file}: {e}")
     
-    real_time_data = carpark_data.copy()
-    print(carpark_data)
+    real_time_data_hdb = carpark_data.copy()
+    real_time_data_ura = carpark_data.copy()
+    # print(carpark_data)
 
     # Start the background task to update real-time availability
-    asyncio.create_task(update_realtime_availability_task(real_time_data))
+    asyncio.create_task(update_realtime_availability_task(real_time_data_hdb))
+    asyncio.create_task(update_URA_availability(real_time_data_ura))
 
 
 @app.get("/find-carpark")
@@ -192,8 +199,11 @@ async def find_carpark(search_query: str = Query(..., min_length=1, max_length=1
         
         # Determine if carpark should be included and its status
         if carpark['type'] == 'HDB':
-            carpark['total_lots'] = real_time_data.get(cp_number, {}).get('total_lots', 0)
-            carpark['available_lots'] = real_time_data.get(cp_number, {}).get('available_lots', 'N/A')
+            carpark['total_lots'] = real_time_data_hdb.get(cp_number, {}).get('total_lots', 0)
+            carpark['available_lots'] = real_time_data_hdb.get(cp_number, {}).get('available_lots', 'N/A')
+        elif carpark['type'] == 'URA':
+            carpark['total_lots'] = real_time_data_ura.get(cp_number, {}).get('total_lots', 0)
+            carpark['available_lots'] = real_time_data_ura.get(cp_number, {}).get('available_lots', 'N/A')
 
         carpark_lat, carpark_lng = carpark['coordinates']
         if carpark_lat is None or carpark_lng is None:
