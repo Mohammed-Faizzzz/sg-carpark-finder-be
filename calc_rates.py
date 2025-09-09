@@ -11,13 +11,32 @@ import math
 
 # 1. Helper to parse time strings (e.g., "07.00 AM" to datetime.time object)
 def parse_time_str_to_obj(time_str: str) -> time:
-    """Converts 'HH:MM AM/PM' string to datetime.time object. Assume the start day is today."""
-    try:
-        return datetime.strptime(time_str, "%I:%M %p").time()
-    except ValueError as e:
-        print(f"Error parsing time string '{time_str}': {e}")
+    """
+    Converts time strings like '07:00 AM', '07.00 AM', '7.00AM', '7:00AM' to datetime.time.
+    Raises ValueError if it can't parse.
+    """
+    if not isinstance(time_str, str):
+        raise ValueError(f"Time is not a string: {time_str!r}")
 
-# print(parse_time_str_to_obj(end_time))  # Example usage
+    s = time_str.strip().upper()
+
+    # Ensure there's a space before AM/PM if missing (e.g., '07.00AM' -> '07.00 AM')
+    s = s.replace("AM", " AM").replace("PM", " PM")
+    s = " ".join(s.split())  # collapse multiple spaces
+
+    # Normalise '.' to ':'
+    s = s.replace(".", ":")
+
+    # Try a few common formats
+    fmts = ("%I:%M %p", "%I %p")  # '07:00 AM', '7 AM'
+    for fmt in fmts:
+        try:
+            return datetime.strptime(s, fmt).time()
+        except ValueError:
+            continue
+
+    # If all fail, surface a clear error
+    raise ValueError(f"Unrecognised time format: {time_str!r} (normalised: {s!r})")
 
 # 2. Helper to parse duration strings (e.g., "30 mins", "0 mins", "810 mins") to timedelta
 def parse_duration_str_to_minutes(duration_str: str) -> int:
@@ -75,7 +94,14 @@ def calc_cost(carpark, start_time, end_time):
         else:
             return calc_hdb_cost(carpark['carpark_number'], start_time, end_time)
     elif carpark['type'] == 'URA':
-        return calc_ura_cost(carpark['carpark_number'], start_time, end_time)
+        start_date, end_date = start_time.date(), end_time.date()
+        if end_date > start_date: # overnight parking
+            # Calculate cost for the first day, set end_time to 23:59:59
+            first_day_end_time = datetime.combine(start_date, time(23, 59, 59))
+            second_day_start_time = datetime.combine(end_date, time(0, 0, 0))
+            return calc_ura_cost(carpark, start_time, first_day_end_time) + calc_ura_cost(carpark, second_day_start_time, end_time)
+        else:
+            return calc_ura_cost(carpark, start_time, end_time)
     else:
         raise ValueError("Unknown carpark type")
 
@@ -92,6 +118,8 @@ def calc_ura_cost(carpark: dict, start_time: datetime, end_time: datetime, veh_c
       "sunday_ph": {...}
     }
     """
+    # print(carpark)
+    # print(f"Calculating URA cost for {carpark['carpark_number']} from {start_time} to {end_time}")
     if "rates" not in carpark or not carpark["rates"]:
         return 0.0
 
