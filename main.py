@@ -25,7 +25,6 @@ carpark_service = CarparkService(onemap_manager)
 async def lifespan(app: FastAPI):
     # Startup
     await carpark_service.startup()
-    logger.info("Application startup complete.b")
     yield
     # Shutdown (if needed)
     

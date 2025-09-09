@@ -79,10 +79,66 @@ def calc_cost(carpark, start_time, end_time):
     else:
         raise ValueError("Unknown carpark type")
 
-# def calc_ura_cost(carpark, start_time, end_time):
-    # narrow down to rate rules based on day type
-    # if spanning multiple days, calculate for each day separately then sum up
-    # if not, calculate for the single day
+def calc_ura_cost(carpark: dict, start_time: datetime, end_time: datetime, veh_cat: str = "Car") -> float:
+    """
+    Calculate URA parking cost for a given carpark and time range.
+    Expects carpark['rates'] to be a list of dicts like:
+    {
+      "veh_cat": "Car",
+      "start_time": "07:00 AM",
+      "end_time": "09:30 AM",
+      "weekday": {"min_duration": "0 mins", "rate": "$1.20"},
+      "saturday": {...},
+      "sunday_ph": {...}
+    }
+    """
+    if "rates" not in carpark or not carpark["rates"]:
+        return 0.0
+
+    total_cost = 0.0
+    current = start_time
+
+    while current < end_time:
+        day_type = get_day_type(current)  # weekday / saturday / sunday_ph
+        day_end = datetime.combine(current.date(), time(23, 59, 59))
+        chunk_end = min(day_end, end_time)
+
+        # Process each rate rule
+        for rule in carpark["rates"]: # Assume rules are sorted by start_time
+            if rule.get("veh_cat") != veh_cat:
+                continue
+
+            try:
+                rule_start = datetime.combine(
+                    current.date(), parse_time_str_to_obj(rule["start_time"])
+                )
+                rule_end = datetime.combine(
+                    current.date(), parse_time_str_to_obj(rule["end_time"])
+                )
+            except Exception:
+                continue
+
+            # Overlap?
+            overlap_start = max(current, rule_start)
+            overlap_end = min(chunk_end, rule_end)
+            if overlap_start >= overlap_end:
+                continue
+
+            rate_info = get_rate_for_day(rule, day_type)
+            if rate_info["rate"] <= 0:
+                continue
+
+            # Duration in minutes (rounded up to billing block)
+            duration_mins = math.ceil((overlap_end - overlap_start).total_seconds() / 60)
+            block = max(rate_info["min_duration"], 1)  # avoid 0 mins
+            blocks = math.ceil(duration_mins / block)
+
+            total_cost += blocks * rate_info["rate"]
+
+        current = chunk_end + timedelta(seconds=1)
+
+    return round(total_cost, 2)
+
 special_rates_HDB = {
     "ACB": {
         "weekdays": [

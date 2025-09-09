@@ -32,7 +32,6 @@ class CarparkService:
 
         asyncio.create_task(update_realtime_availability_task(self.hdb_data))
         asyncio.create_task(update_URA_availability(self.ura_data))
-        logger.info("carpark data: {}".format(self.carpark_data))
 
     async def find_coord(self, query: str) -> tuple:
         token = await self.token_manager.get_token()
