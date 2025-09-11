@@ -8,6 +8,7 @@ from ura_availability import update_URA_availability
 from token_manager import OneMapTokenManager
 from carpark_service import CarparkService
 from contextlib import asynccontextmanager
+from typing import Optional
 
 
 load_dotenv()
@@ -51,8 +52,13 @@ app.add_middleware(
 
 
 @app.get("/find-carpark")
-async def find_carpark(search_query: str, limit: int = Query(10, gt=0, le=50)):
-    return await carpark_service.find_carpark(search_query, limit)
+async def find_carpark(search_query: str, limit: int = Query(10, gt=0, le=50), start_time: Optional[datetime] = None, 
+        end_time: Optional[datetime] = None):
+    logger.info(f"search_query:  {search_query}")
+    logger.info(f"Start time: {start_time}, End time: {end_time}")
+    res = await carpark_service.find_carpark(search_query, limit, start_time, end_time)
+    # logger.info(res)
+    return res
 
 
 @app.get("/health")

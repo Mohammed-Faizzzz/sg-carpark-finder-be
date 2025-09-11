@@ -8,7 +8,9 @@ logger = logging.getLogger(__name__)
 from startup import load_HDB_carpark_data, update_realtime_availability_task, parse_ura_feature, load_URA_carpark_data
 from ura_availability import get_access_token, update_URA_availability
 from token_manager import OneMapTokenManager
+from calc_rates import calc_cost
 import copy
+from typing import Optional
 
 class CarparkService:
     def __init__(self, token_manager: OneMapTokenManager, data_file: str = "./data/combined_carpark_data.json"):
@@ -72,17 +74,35 @@ class CarparkService:
         if not results:
             raise HTTPException(status_code=404, detail="No suitable carparks found")
 
-        return sorted(results, key=lambda c: c["distance"])[:limit]
+        return sorted(results, key=lambda c: c["distance"])[:limit] 
 
-    async def find_carpark(self, query: str, limit: int=10) -> list:
+    async def find_carpark(
+        self, 
+        query: str, 
+        limit: int = 10, 
+        start_time: Optional[datetime] = None, 
+        end_time: Optional[datetime] = None
+    ) -> list:
         # Step 1: Find User's coordinates
         user_lat, user_lng = await self.find_coord(query)
 
         # Step 2: Find nearest carparks
         if not self.carpark_data:
             raise HTTPException(status_code=500, detail="Carpark data not loaded")
-
-        return await self.find_nearest_carpark(user_lat, user_lng, limit)
+        
+        list_of_carparks = await self.find_nearest_carpark(user_lat, user_lng, limit)
+        # modify carparks in place to include rates
+        if start_time and end_time:
+            for cp in list_of_carparks:
+                try:
+                    cp["cost"] = calc_cost(cp, start_time, end_time)
+                except Exception as e:
+                    cp["cost_note"] = f"Error calculating cost: {e}"
+        else:
+            for cp in list_of_carparks:
+                cp["cost_note"] = "Provide start & end time to estimate cost"
+        
+        return list_of_carparks
 
     def _haversine(self, lat1, lon1, lat2, lon2) -> float:
         R = 6371e3
