@@ -180,10 +180,10 @@ def load_URA_carpark_data(file_path, data):
     return data
 
 # Load all the data, then save it as a json file
-prep_data_file = './HDBCarparkInformation.csv'
+prep_data_file = './data/HDBCarparkInformation.csv'
 data = load_HDB_carpark_data(prep_data_file, data)
 
-prep_data_file_ura = './carpark_rates.json'
+prep_data_file_ura = './data/carpark_rates.json'
 data = load_URA_carpark_data(prep_data_file_ura, data)
 
 # Check for None values in coordinates
